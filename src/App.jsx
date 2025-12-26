@@ -10,15 +10,66 @@ import {
   CheckCircle2, 
   AlertTriangle,
   Loader2,
-  Sparkles
+  Sparkles,
+  Lightbulb
 } from 'lucide-react';
+
+// Helper component to format the markdown-style text from API
+const RecommendationDisplay = ({ text }) => {
+  if (!text) return null;
+
+  // Split text to separate intro from points (assuming points start with '*')
+  const sections = text.split('*');
+  const intro = sections[0]; // The text before the first bullet
+  const points = sections.slice(1); // The bullet points
+
+  return (
+    <div className="space-y-4">
+      {/* Intro Text */}
+      {intro && (
+        <p className="text-zinc-300 text-sm leading-relaxed mb-4 border-b border-white/5 pb-4">
+          {intro}
+        </p>
+      )}
+
+      {/* Bullet Points */}
+      <div className="grid gap-3">
+        {points.map((point, index) => {
+          // Parse bold text formatted as **Text**
+          const parts = point.split(/(\*\*.*?\*\*)/g);
+          
+          return (
+            <div key={index} className="flex gap-3 items-start bg-white/5 p-4 rounded-xl border border-white/5 hover:border-emerald-500/30 transition-colors group">
+              <div className="mt-1 bg-emerald-500/20 p-1.5 rounded-full shrink-0 group-hover:bg-emerald-500/30 transition-colors">
+                <Lightbulb className="w-3.5 h-3.5 text-emerald-400" />
+              </div>
+              <p className="text-zinc-300 text-sm leading-relaxed">
+                {parts.map((part, i) => {
+                  if (part.startsWith('**') && part.endsWith('**')) {
+                    // Remove asterisks and render bold/colored
+                    return (
+                      <span key={i} className="block text-emerald-300 font-semibold mb-1 text-base">
+                        {part.slice(2, -2)}
+                      </span>
+                    );
+                  }
+                  return <span key={i}>{part}</span>;
+                })}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const App = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
-  // Initial form state based on your API requirements
+  // Initial form state
   const [formData, setFormData] = useState({
     street_id: '',
     pm2_5: '',
@@ -43,7 +94,7 @@ const App = () => {
     setError(null);
     setResult(null);
 
-    // Prepare payload - converting strings to numbers where necessary
+    // Prepare payload
     const payload = {
       street_id: Number(formData.street_id),
       pm2_5: Number(formData.pm2_5),
@@ -236,10 +287,10 @@ const App = () => {
             {result && (
               <>
                 {/* Status Card */}
-                <div className={`p-8 rounded-3xl border backdrop-blur-xl ${
+                <div className={`p-8 rounded-3xl border backdrop-blur-xl transition-all duration-500 ${
                   result["cleaning needs"] === "Yes" 
-                    ? 'bg-amber-500/10 border-amber-500/20' 
-                    : 'bg-emerald-500/10 border-emerald-500/20'
+                    ? 'bg-amber-500/10 border-amber-500/20 shadow-[0_0_30px_rgba(245,158,11,0.1)]' 
+                    : 'bg-emerald-500/10 border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.1)]'
                 }`}>
                   <div className="flex items-start justify-between">
                     <div>
@@ -260,7 +311,7 @@ const App = () => {
                   </div>
                 </div>
 
-                {/* AI Suggestion Card */}
+                {/* AI Suggestion Card - UPDATED SECTION */}
                 <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-32 bg-emerald-500/5 blur-[80px] rounded-full pointer-events-none" />
                   
@@ -269,9 +320,9 @@ const App = () => {
                     AI Recommendations
                   </h4>
                   
-                  <div className="prose prose-invert prose-sm max-w-none text-zinc-300 leading-relaxed whitespace-pre-line">
-                    {result.suggestion}
-                  </div>
+                  {/* Using the custom parser component here */}
+                  <RecommendationDisplay text={result.suggestion} />
+                  
                 </div>
               </>
             )}
