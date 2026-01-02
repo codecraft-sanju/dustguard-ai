@@ -1,14 +1,134 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Wind, Droplets, Thermometer, Car, Activity, MapPin, Cpu, 
   Loader2, Sparkles, Zap, Scan, RefreshCw, Siren, TrendingUp, Globe, Crosshair
 } from 'lucide-react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 // --- CONFIGURATION ---
+// ⚠️ GET A FREE TOKEN AT MAPBOX.COM AND PASTE IT HERE
+const MAPBOX_TOKEN = "pk.eyJ1Ijoic2FuanV1dTE4IiwiYSI6ImNtandqdmFicDV4em8zaHF4d3ptZndsZWcifQ.dPu5TNl1OPiZ6KtbFghp5Q"; 
 const WEATHER_API_KEY = "e8f92dba56b67251fe8972441eb51dad"; 
 const CITY_LAT = 28.6139; // Delhi Latitude
 const CITY_LON = 77.2090; // Delhi Longitude
 
+// --- 1. SUB-COMPONENT: 3D MAP VISUALIZER ---
+const MapVisualizer = ({ lat, lon, isCritical }) => {
+  const mapContainer = useRef(null);
+  const map = useRef(null);
+
+  useEffect(() => {
+    if (map.current) return; // Initialize only once
+    
+    // Set Token
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/dark-v11', // Iron Man Theme
+      center: [lon, lat],
+      zoom: 12,
+      pitch: 45, // 3D Tilt
+      bearing: -17.6,
+      antialias: true
+    });
+
+    map.current.on('load', () => {
+      // Add 3D Buildings
+      const layers = map.current.getStyle().layers;
+      const labelLayerId = layers.find(
+        (layer) => layer.type === 'symbol' && layer.layout['text-field']
+      ).id;
+
+      map.current.addLayer(
+        {
+          'id': 'add-3d-buildings',
+          'source': 'composite',
+          'source-layer': 'building',
+          'filter': ['==', 'extrude', 'true'],
+          'type': 'fill-extrusion',
+          'minzoom': 13,
+          'paint': {
+            'fill-extrusion-color': '#444',
+            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'height']],
+            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'min_height']],
+            'fill-extrusion-opacity': 0.6
+          }
+        },
+        labelLayerId
+      );
+
+      // Add Pollution Heatmap Source
+      map.current.addSource('pollution-heat', {
+        type: 'geojson',
+        data: {
+            type: 'FeatureCollection',
+            features: [{
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [lon, lat] }
+            }]
+        }
+      });
+
+      // Add Pollution Glow Layer
+      map.current.addLayer({
+        id: 'pollution-glow',
+        type: 'circle',
+        source: 'pollution-heat',
+        paint: {
+            'circle-radius': 80,
+            'circle-color': isCritical ? '#ef4444' : '#10b981',
+            'circle-opacity': 0.4,
+            'circle-blur': 0.5
+        }
+      });
+    });
+  }, []); // Run once on mount
+
+  // React to "Critical Alert" (The Pivot)
+  useEffect(() => {
+    if (!map.current) return;
+
+    if (isCritical) {
+        // Dramatic Zoom In
+        map.current.flyTo({
+            center: [lon, lat],
+            zoom: 16,
+            pitch: 60,
+            speed: 1.2,
+            curve: 1,
+            essential: true
+        });
+        
+        if (map.current.getLayer('pollution-glow')) {
+            map.current.setPaintProperty('pollution-glow', 'circle-color', '#ef4444');
+            map.current.setPaintProperty('pollution-glow', 'circle-radius', 120);
+        }
+    } else {
+        // Reset View
+         map.current.flyTo({ zoom: 12, pitch: 45 });
+         if (map.current.getLayer('pollution-glow')) {
+            map.current.setPaintProperty('pollution-glow', 'circle-color', '#10b981');
+            map.current.setPaintProperty('pollution-glow', 'circle-radius', 80);
+         }
+    }
+  }, [isCritical, lat, lon]);
+
+  return <div ref={mapContainer} className="w-full h-full opacity-90 min-h-[100%]" />;
+};
+
+// --- 2. SUB-COMPONENT: INPUT GROUP ---
+const InputGroup = ({ label, icon, name, value, onChange, placeholder, fullWidth, delay }) => (
+  <div className={`space-y-2 ${fullWidth ? 'col-span-2' : ''}`}>
+    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2 ml-1">
+      <span className="text-emerald-500/80">{React.cloneElement(icon, { size: 12 })}</span> {label}
+    </label>
+    <input type="number" name={name} value={value} onChange={onChange} placeholder={placeholder} className="w-full bg-zinc-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-zinc-300 focus:border-emerald-500/50 focus:bg-zinc-900 outline-none transition-all font-mono" />
+  </div>
+);
+
+// --- 3. MAIN APP COMPONENT ---
 const App = () => {
   const [loading, setLoading] = useState(false);
   const [dataFetching, setDataFetching] = useState(false);
@@ -23,7 +143,7 @@ const App = () => {
   useEffect(() => { setMounted(true); }, []);
 
   const [formData, setFormData] = useState({
-    street_id: '04', // Default ID set kiya taki map par kuch dikhe
+    street_id: '04', 
     pm2_5: '',
     pm10: '',
     humidity: '',
@@ -83,11 +203,15 @@ const App = () => {
 
   // --- DEMO MODE ---
   const triggerDemoEmergency = () => {
+    // 1. Set Critical Data
     setFormData({
       street_id: 101, pm2_5: 350.5, pm10: 410.2, humidity: 20, 
       temperature: 42, traffic_density: 'High', dust_index: 380
     });
+    // 2. Spike the Graph
     setGraphData([60, 80, 120, 200, 350, 400, 420]);
+    
+    // 3. Trigger the UI Alert (and Map Zoom)
     setTimeout(() => { setAlertTriggered(true); }, 500);
   };
 
@@ -216,48 +340,38 @@ const App = () => {
           <div className="lg:col-span-7 flex flex-col gap-6">
             
             {/* Top Row: REAL MAP & Graph */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-64">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[300px] h-full">
                 
-                {/* 1. REAL SATELLITE MAP with TARGET OVERLAY (Updated) */}
-                <div className="relative bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden group">
-                    {/* Header Overlay */}
-                    <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white/90 px-2 py-1 rounded shadow-lg backdrop-blur-sm">
-                        <Globe className="w-3 h-3 text-blue-600" />
-                        <span className="text-[10px] font-bold text-zinc-800 uppercase tracking-widest">Live Sat-Feed</span>
+                {/* 1. UPDATED: 3D MAPBOX INTEGRATION */}
+                <div className="relative bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden group h-full">
+                    {/* Map Header Overlay */}
+                    <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-black/80 px-3 py-1.5 rounded border border-white/10 backdrop-blur-md">
+                        <Globe className={`w-3 h-3 ${alertTriggered ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`} />
+                        <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">
+                            {alertTriggered ? 'Drone View: ACTIVE' : 'Sat-Feed: STABLE'}
+                        </span>
                     </div>
 
-                    {/* The Map */}
-                    <iframe 
-                        width="100%" 
-                        height="100%" 
-                        title="Live Map Feed"
-                        frameBorder="0" 
-                        scrolling="no" 
-                        marginHeight="0" 
-                        marginWidth="0" 
-                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${CITY_LON-0.05}%2C${CITY_LAT-0.05}%2C${CITY_LON+0.05}%2C${CITY_LAT+0.05}&amp;layer=mapnik&amp;marker=${CITY_LAT}%2C${CITY_LON}`}
-                        className="w-full h-full opacity-80"
-                    ></iframe>
+                    {/* The 3D Map Component */}
+                    <MapVisualizer 
+                        lat={CITY_LAT} 
+                        lon={CITY_LON} 
+                        isCritical={alertTriggered} 
+                    />
 
-                    {/* --- NEW: VISIBLE MARKER/TARGET SYSTEM --- */}
+                    {/* Target Overlay (Looks cool on top of the 3D Map) */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center justify-center">
-                        {/* The Pulse Effect */}
                         <div className={`relative flex items-center justify-center w-12 h-12`}>
                             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${alertTriggered ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                            <div className={`relative inline-flex items-center justify-center rounded-full h-8 w-8 bg-black border-2 ${alertTriggered ? 'border-red-500' : 'border-emerald-500'}`}>
+                            <div className={`relative inline-flex items-center justify-center rounded-full h-8 w-8 bg-black/50 border-2 backdrop-blur-sm ${alertTriggered ? 'border-red-500' : 'border-emerald-500'}`}>
                                 <Crosshair className={`w-4 h-4 ${alertTriggered ? 'text-red-500' : 'text-emerald-500'}`} />
                             </div>
-                        </div>
-                        
-                        {/* Info Tag pointing to the location */}
-                        <div className={`mt-2 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border ${alertTriggered ? 'bg-red-500/80 text-white border-red-400' : 'bg-black/70 text-emerald-400 border-emerald-500/50'}`}>
-                             STREET ID: {formData.street_id || 'SCANNING...'}
                         </div>
                     </div>
                 </div>
 
                 {/* 2. PREDICTION GRAPH */}
-                <div className="relative bg-[#0A0A0A]/90 border border-white/10 rounded-3xl overflow-hidden p-4 flex flex-col">
+                <div className="relative bg-[#0A0A0A]/90 border border-white/10 rounded-3xl overflow-hidden p-4 flex flex-col h-full min-h-[250px]">
                     <div className="flex justify-between items-center mb-4 z-10">
                          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">PM 2.5 Forecast</span>
                          <TrendingUp className="w-4 h-4 text-zinc-600" />
@@ -265,7 +379,7 @@ const App = () => {
                     
                     <div className="flex-1 flex items-end justify-between gap-2 relative z-10 px-2 pb-2">
                         {graphData.map((val, i) => (
-                            <div key={i} className="w-full relative group">
+                            <div key={i} className="w-full relative group h-full flex items-end">
                                 <div 
                                     style={{ height: `${Math.min(val, 100)}%` }} 
                                     className={`w-full rounded-t-sm transition-all duration-1000 ${alertTriggered ? 'bg-gradient-to-t from-red-900/50 to-red-500' : 'bg-gradient-to-t from-emerald-900/50 to-emerald-500'}`}
@@ -273,6 +387,7 @@ const App = () => {
                             </div>
                         ))}
                     </div>
+                    {/* Grid Lines */}
                     <div className="absolute inset-0 border-t border-white/5 top-1/2" />
                     <div className="absolute inset-0 border-t border-white/5 top-1/4" />
                     <div className="absolute inset-0 border-t border-white/5 top-3/4" />
@@ -280,7 +395,7 @@ const App = () => {
             </div>
 
             {/* Bottom: Result Output */}
-            <div className={`flex-1 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30 shadow-[0_0_30px_rgba(220,38,38,0.1)]' : 'border-white/10'} rounded-3xl p-8 overflow-hidden flex flex-col justify-center min-h-[300px]`}>
+            <div className={`flex-1 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30 shadow-[0_0_30px_rgba(220,38,38,0.1)]' : 'border-white/10'} rounded-3xl p-8 overflow-hidden flex flex-col justify-center min-h-[250px]`}>
                
                <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent h-[20%] animate-scan pointer-events-none ${alertTriggered ? 'via-red-500/10' : ''}`} />
 
@@ -331,14 +446,5 @@ const App = () => {
     </div>
   );
 };
-
-const InputGroup = ({ label, icon, name, value, onChange, placeholder, fullWidth, delay }) => (
-  <div className={`space-y-2 ${fullWidth ? 'col-span-2' : ''}`}>
-    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2 ml-1">
-      <span className="text-emerald-500/80">{React.cloneElement(icon, { size: 12 })}</span> {label}
-    </label>
-    <input type="number" name={name} value={value} onChange={onChange} placeholder={placeholder} className="w-full bg-zinc-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-zinc-300 focus:border-emerald-500/50 focus:bg-zinc-900 outline-none transition-all font-mono" />
-  </div>
-);
 
 export default App;
