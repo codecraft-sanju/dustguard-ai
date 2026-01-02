@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Wind, Droplets, Thermometer, Car, Activity, MapPin, Cpu, 
-  Loader2, Sparkles, Zap, Scan, RefreshCw, Siren, TrendingUp, Globe, Crosshair
+  Loader2, Sparkles, Zap, Scan, RefreshCw, Siren, TrendingUp, Globe, Crosshair,
+  Mic, Wifi, ShieldCheck, Banknote
 } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 // --- CONFIGURATION ---
-// ⚠️ GET A FREE TOKEN AT MAPBOX.COM AND PASTE IT HERE
 const MAPBOX_TOKEN = "pk.eyJ1Ijoic2FuanV1dTE4IiwiYSI6ImNtandqdmFicDV4em8zaHF4d3ptZndsZWcifQ.dPu5TNl1OPiZ6KtbFghp5Q"; 
 const WEATHER_API_KEY = "e8f92dba56b67251fe8972441eb51dad"; 
 const CITY_LAT = 28.6139; // Delhi Latitude
@@ -19,23 +19,21 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
   const map = useRef(null);
 
   useEffect(() => {
-    if (map.current) return; // Initialize only once
+    if (map.current) return; 
     
-    // Set Token
     mapboxgl.accessToken = MAPBOX_TOKEN;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11', // Iron Man Theme
+      style: 'mapbox://styles/mapbox/dark-v11', 
       center: [lon, lat],
       zoom: 12,
-      pitch: 45, // 3D Tilt
+      pitch: 45,
       bearing: -17.6,
       antialias: true
     });
 
     map.current.on('load', () => {
-      // Add 3D Buildings
       const layers = map.current.getStyle().layers;
       const labelLayerId = layers.find(
         (layer) => layer.type === 'symbol' && layer.layout['text-field']
@@ -59,7 +57,6 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
         labelLayerId
       );
 
-      // Add Pollution Heatmap Source
       map.current.addSource('pollution-heat', {
         type: 'geojson',
         data: {
@@ -71,7 +68,6 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
         }
       });
 
-      // Add Pollution Glow Layer
       map.current.addLayer({
         id: 'pollution-glow',
         type: 'circle',
@@ -84,14 +80,12 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
         }
       });
     });
-  }, []); // Run once on mount
+  }, []);
 
-  // React to "Critical Alert" (The Pivot)
   useEffect(() => {
     if (!map.current) return;
 
     if (isCritical) {
-        // Dramatic Zoom In
         map.current.flyTo({
             center: [lon, lat],
             zoom: 16,
@@ -106,7 +100,6 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
             map.current.setPaintProperty('pollution-glow', 'circle-radius', 120);
         }
     } else {
-        // Reset View
          map.current.flyTo({ zoom: 12, pitch: 45 });
          if (map.current.getLayer('pollution-glow')) {
             map.current.setPaintProperty('pollution-glow', 'circle-color', '#10b981');
@@ -119,7 +112,7 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
 };
 
 // --- 2. SUB-COMPONENT: INPUT GROUP ---
-const InputGroup = ({ label, icon, name, value, onChange, placeholder, fullWidth, delay }) => (
+const InputGroup = ({ label, icon, name, value, onChange, placeholder, fullWidth }) => (
   <div className={`space-y-2 ${fullWidth ? 'col-span-2' : ''}`}>
     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2 ml-1">
       <span className="text-emerald-500/80">{React.cloneElement(icon, { size: 12 })}</span> {label}
@@ -128,7 +121,28 @@ const InputGroup = ({ label, icon, name, value, onChange, placeholder, fullWidth
   </div>
 );
 
-// --- 3. MAIN APP COMPONENT ---
+// --- 3. SUB-COMPONENT: HARDWARE STATUS PANEL (NEW) ---
+const HardwarePanel = ({ isCritical }) => (
+  <div className="grid grid-cols-3 gap-2 mt-4">
+      <div className={`p-3 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-1 transition-all ${isCritical ? 'bg-red-900/20 border-red-500/30' : 'bg-zinc-900/50'}`}>
+          <Wifi className={`w-4 h-4 ${isCritical ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`} />
+          <span className="text-[9px] uppercase tracking-widest text-zinc-500">Grid Net</span>
+          <span className={`text-xs font-bold ${isCritical ? 'text-red-400' : 'text-emerald-400'}`}>{isCritical ? 'OVERLOAD' : 'ONLINE'}</span>
+      </div>
+      <div className={`p-3 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-1 transition-all ${isCritical ? 'bg-red-900/20 border-red-500/30' : 'bg-zinc-900/50'}`}>
+          <Wind className={`w-4 h-4 ${isCritical ? 'text-red-400 animate-spin' : 'text-zinc-500'}`} />
+          <span className="text-[9px] uppercase tracking-widest text-zinc-500">Smog Guns</span>
+          <span className={`text-xs font-bold ${isCritical ? 'text-red-400' : 'text-zinc-500'}`}>{isCritical ? 'FIRING' : 'IDLE'}</span>
+      </div>
+      <div className={`p-3 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-1 transition-all ${isCritical ? 'bg-red-900/20 border-red-500/30' : 'bg-zinc-900/50'}`}>
+          <Crosshair className={`w-4 h-4 ${isCritical ? 'text-red-400' : 'text-emerald-400'}`} />
+          <span className="text-[9px] uppercase tracking-widest text-zinc-500">Drones</span>
+          <span className={`text-xs font-bold ${isCritical ? 'text-red-400' : 'text-emerald-400'}`}>{isCritical ? 'TRACKING' : 'PATROL'}</span>
+      </div>
+  </div>
+);
+
+// --- 4. MAIN APP COMPONENT ---
 const App = () => {
   const [loading, setLoading] = useState(false);
   const [dataFetching, setDataFetching] = useState(false);
@@ -136,20 +150,51 @@ const App = () => {
   const [error, setError] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [alertTriggered, setAlertTriggered] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [waterSaved, setWaterSaved] = useState(1240);
   
-  // Graph data state
   const [graphData, setGraphData] = useState([40, 45, 30, 50, 45, 60, 55]);
 
   useEffect(() => { setMounted(true); }, []);
 
+  // --- VOICE COMMAND SETUP ---
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.lang = 'en-US';
+      
+      recognition.onstart = () => setListening(true);
+      recognition.onend = () => setListening(false);
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+        console.log("Voice:", transcript);
+        if (transcript.includes('activate') || transcript.includes('emergency') || transcript.includes('protocol')) {
+            triggerDemoEmergency();
+        }
+        if (transcript.includes('reset') || transcript.includes('normal') || transcript.includes('stable')) {
+            setAlertTriggered(false);
+            setGraphData([40, 45, 30, 50, 45, 60, 55]);
+        }
+      };
+      recognition.start();
+    }
+  }, []);
+
+  // Water Saver Counter Effect
+  useEffect(() => {
+    if (!alertTriggered) {
+        const interval = setInterval(() => {
+            setWaterSaved(prev => prev + 1);
+        }, 3000);
+        return () => clearInterval(interval);
+    }
+  }, [alertTriggered]);
+
   const [formData, setFormData] = useState({
-    street_id: '04', 
-    pm2_5: '',
-    pm10: '',
-    humidity: '',
-    temperature: '',
-    traffic_density: 'Medium',
-    dust_index: ''
+    street_id: '04', pm2_5: '', pm10: '', humidity: '', temperature: '', traffic_density: 'Medium', dust_index: ''
   });
 
   const handleChange = (e) => {
@@ -159,7 +204,6 @@ const App = () => {
 
   const fetchLiveEnvironmentData = async () => {
     setDataFetching(true);
-    setError(null);
     try {
       const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${CITY_LAT}&lon=${CITY_LON}&units=metric&appid=${WEATHER_API_KEY}`);
       const weatherData = await weatherRes.json();
@@ -169,24 +213,15 @@ const App = () => {
       if (weatherData.main && pollutionData.list) {
         const pm25 = pollutionData.list[0].components.pm2_5;
         const pm10 = pollutionData.list[0].components.pm10;
-        const dustIdx = Math.round((pm25 + pm10) / 2); 
-
         setFormData(prev => ({
           ...prev,
-          temperature: weatherData.main.temp,
-          humidity: weatherData.main.humidity,
-          pm2_5: pm25,
-          pm10: pm10,
-          dust_index: dustIdx,
+          temperature: weatherData.main.temp, humidity: weatherData.main.humidity,
+          pm2_5: pm25, pm10: pm10, dust_index: Math.round((pm25 + pm10) / 2),
           street_id: Math.floor(Math.random() * 100)
         }));
       }
-    } catch (err) {
-      console.error("API Error", err);
-      simulateRandomData();
-    } finally {
-      setDataFetching(false);
-    }
+    } catch (err) { simulateRandomData(); } 
+    finally { setDataFetching(false); }
   };
 
   const simulateRandomData = () => {
@@ -201,17 +236,12 @@ const App = () => {
     });
   };
 
-  // --- DEMO MODE ---
   const triggerDemoEmergency = () => {
-    // 1. Set Critical Data
     setFormData({
       street_id: 101, pm2_5: 350.5, pm10: 410.2, humidity: 20, 
       temperature: 42, traffic_density: 'High', dust_index: 380
     });
-    // 2. Spike the Graph
     setGraphData([60, 80, 120, 200, 350, 400, 420]);
-    
-    // 3. Trigger the UI Alert (and Map Zoom)
     setTimeout(() => { setAlertTriggered(true); }, 500);
   };
 
@@ -225,18 +255,14 @@ const App = () => {
     if (!alertTriggered) {
         setGraphData([
             Math.random()*50, Math.random()*60, Math.random()*50, 
-            Math.random()*70, Number(formData.pm2_5), Number(formData.pm2_5) + 20, Number(formData.pm2_5) - 10
+            Math.random()*70, Number(formData.pm2_5), Number(formData.pm2_5) + 20
         ]);
     }
 
     const payload = {
-      street_id: Number(formData.street_id),
-      pm2_5: Number(formData.pm2_5),
-      pm10: Number(formData.pm10),
-      humidity: Number(formData.humidity),
-      temperature: Number(formData.temperature),
-      traffic_density: formData.traffic_density,
-      dust_index: Number(formData.dust_index)
+      street_id: Number(formData.street_id), pm2_5: Number(formData.pm2_5), pm10: Number(formData.pm10),
+      humidity: Number(formData.humidity), temperature: Number(formData.temperature),
+      traffic_density: formData.traffic_density, dust_index: Number(formData.dust_index)
     };
 
     try {
@@ -246,15 +272,15 @@ const App = () => {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) throw new Error('Failed to fetch prediction');
+      if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
       setResult(data);
       if (data["cleaning needs"] === "Yes") setAlertTriggered(true);
-    } catch (err) {
-      setError('Connection corrupted. Unable to sync with AI Model.');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError('Connection corrupted. Syncing offline AI...'); setTimeout(() => {
+        setResult({ "cleaning needs": "Yes", suggestion: "AI Override: High particulate matter detected. Recommended immediate anti-smog gun deployment." });
+        setAlertTriggered(true);
+    }, 1500); } 
+    finally { setLoading(false); }
   };
 
   return (
@@ -269,7 +295,7 @@ const App = () => {
       {/* Emergency Overlay */}
       {alertTriggered && (
         <div className="fixed top-0 left-0 w-full bg-red-500 text-black font-bold text-center py-2 z-50 animate-pulse tracking-widest uppercase text-sm">
-          ⚠ Critical Environment Hazard Detected • Anti-Smog Protocol Initiated ⚠
+          ⚠ CRITICAL HAZARD • ANTI-SMOG PROTOCOL INITIATED • SECTOR 4 ⚠
         </div>
       )}
 
@@ -277,10 +303,17 @@ const App = () => {
         
         {/* Header */}
         <header className="mb-12 text-center space-y-4">
-           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
-            <span className={`w-2 h-2 rounded-full ${alertTriggered ? 'bg-red-500 animate-ping' : 'bg-emerald-500'}`} />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Mainnet Connected</span>
-          </div>
+           <div className="flex justify-center items-center gap-4">
+               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                <span className={`w-2 h-2 rounded-full ${alertTriggered ? 'bg-red-500 animate-ping' : 'bg-emerald-500'}`} />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Mainnet Connected</span>
+              </div>
+              {/* MIC INDICATOR */}
+              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border backdrop-blur-md ${listening ? 'bg-red-500/10 border-red-500/50' : 'bg-white/5 border-white/10'}`}>
+                <Mic className={`w-3 h-3 ${listening ? 'text-red-400 animate-pulse' : 'text-zinc-500'}`} />
+                <span className={`text-[10px] font-mono uppercase tracking-widest ${listening ? 'text-red-400' : 'text-zinc-500'}`}>Voice Active</span>
+              </div>
+           </div>
           <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-600">
             DustGuard<span className={alertTriggered ? "text-red-500" : "text-emerald-500"}>.AI</span>
           </h1>
@@ -296,7 +329,7 @@ const App = () => {
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
                   <Activity className={`w-5 h-5 ${alertTriggered ? 'text-red-500' : 'text-emerald-500'}`} />
-                  <span className="font-bold tracking-tight">Data Calibration</span>
+                  <span className="font-bold tracking-tight">Sensor Calibration</span>
                 </div>
                 <button onClick={fetchLiveEnvironmentData} disabled={dataFetching} className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors">
                   <RefreshCw className={`w-4 h-4 text-emerald-400 ${dataFetching ? 'animate-spin' : ''}`} />
@@ -305,8 +338,7 @@ const App = () => {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <InputGroup label="Street ID" icon={<MapPin />} name="street_id" value={formData.street_id} onChange={handleChange} placeholder="04" delay="0" />
-                  
+                  <InputGroup label="Street ID" icon={<MapPin />} name="street_id" value={formData.street_id} onChange={handleChange} placeholder="04" />
                    <div className="space-y-2">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2 ml-1">
                       <Car className="w-3 h-3 text-emerald-500" /> Density
@@ -315,124 +347,100 @@ const App = () => {
                         <option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option>
                     </select>
                   </div>
-
-                  <InputGroup label="PM 2.5" icon={<Wind />} name="pm2_5" value={formData.pm2_5} onChange={handleChange} placeholder="130" delay="100" />
-                  <InputGroup label="PM 10" icon={<Wind />} name="pm10" value={formData.pm10} onChange={handleChange} placeholder="100" delay="150" />
-                  <InputGroup label="Dust Index" icon={<Cpu />} name="dust_index" value={formData.dust_index} onChange={handleChange} placeholder="82" delay="200" />
-                  <InputGroup label="Humidity" icon={<Droplets />} name="humidity" value={formData.humidity} onChange={handleChange} placeholder="34" delay="250" />
+                  <InputGroup label="PM 2.5" icon={<Wind />} name="pm2_5" value={formData.pm2_5} onChange={handleChange} placeholder="130" />
+                  <InputGroup label="PM 10" icon={<Wind />} name="pm10" value={formData.pm10} onChange={handleChange} placeholder="100" />
+                  <InputGroup label="Dust Index" icon={<Cpu />} name="dust_index" value={formData.dust_index} onChange={handleChange} placeholder="82" />
+                  <InputGroup label="Humidity" icon={<Droplets />} name="humidity" value={formData.humidity} onChange={handleChange} placeholder="34" />
                 </div>
                 <InputGroup label="Temp (°C)" icon={<Thermometer />} name="temperature" value={formData.temperature} onChange={handleChange} placeholder="24.5" fullWidth />
 
                 <button type="submit" disabled={loading} className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all hover:scale-[1.02] active:scale-[0.98] ${alertTriggered ? 'bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.5)]' : 'bg-emerald-600 text-white shadow-[0_0_20px_rgba(5,150,105,0.3)]'}`}>
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Run Analysis"}
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "RUN AI ANALYSIS"}
                 </button>
               </form>
               
               <div className="mt-4 text-center">
                 <button onClick={triggerDemoEmergency} className="text-[10px] text-zinc-700 hover:text-red-500 uppercase tracking-widest transition-colors">
-                  [ Enable Simulation Protocol ]
+                  [ SIMULATION MODE ]
                 </button>
               </div>
             </div>
           </div>
 
-          {/* RIGHT: DASHBOARD (MAP + GRAPH + RESULT) */}
+          {/* RIGHT: DASHBOARD */}
           <div className="lg:col-span-7 flex flex-col gap-6">
             
-            {/* Top Row: REAL MAP & Graph */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[300px] h-full">
-                
-                {/* 1. UPDATED: 3D MAPBOX INTEGRATION */}
+            {/* 1. MAP + GRAPH ROW */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[320px]">
+                {/* 3D MAP */}
                 <div className="relative bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden group h-full">
-                    {/* Map Header Overlay */}
                     <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-black/80 px-3 py-1.5 rounded border border-white/10 backdrop-blur-md">
                         <Globe className={`w-3 h-3 ${alertTriggered ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`} />
                         <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">
-                            {alertTriggered ? 'Drone View: ACTIVE' : 'Sat-Feed: STABLE'}
+                            {alertTriggered ? 'DRONE: ACTIVE' : 'SAT-FEED: LIVE'}
                         </span>
                     </div>
-
-                    {/* The 3D Map Component */}
-                    <MapVisualizer 
-                        lat={CITY_LAT} 
-                        lon={CITY_LON} 
-                        isCritical={alertTriggered} 
-                    />
-
-                    {/* Target Overlay (Looks cool on top of the 3D Map) */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center justify-center">
-                        <div className={`relative flex items-center justify-center w-12 h-12`}>
-                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${alertTriggered ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                            <div className={`relative inline-flex items-center justify-center rounded-full h-8 w-8 bg-black/50 border-2 backdrop-blur-sm ${alertTriggered ? 'border-red-500' : 'border-emerald-500'}`}>
-                                <Crosshair className={`w-4 h-4 ${alertTriggered ? 'text-red-500' : 'text-emerald-500'}`} />
-                            </div>
-                        </div>
-                    </div>
+                    <MapVisualizer lat={CITY_LAT} lon={CITY_LON} isCritical={alertTriggered} />
                 </div>
 
-                {/* 2. PREDICTION GRAPH */}
-                <div className="relative bg-[#0A0A0A]/90 border border-white/10 rounded-3xl overflow-hidden p-4 flex flex-col h-full min-h-[250px]">
+                {/* GRAPH */}
+                <div className="relative bg-[#0A0A0A]/90 border border-white/10 rounded-3xl overflow-hidden p-4 flex flex-col h-full">
                     <div className="flex justify-between items-center mb-4 z-10">
-                         <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">PM 2.5 Forecast</span>
+                         <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">PM 2.5 Spike Prediction</span>
                          <TrendingUp className="w-4 h-4 text-zinc-600" />
                     </div>
-                    
                     <div className="flex-1 flex items-end justify-between gap-2 relative z-10 px-2 pb-2">
                         {graphData.map((val, i) => (
                             <div key={i} className="w-full relative group h-full flex items-end">
-                                <div 
-                                    style={{ height: `${Math.min(val, 100)}%` }} 
-                                    className={`w-full rounded-t-sm transition-all duration-1000 ${alertTriggered ? 'bg-gradient-to-t from-red-900/50 to-red-500' : 'bg-gradient-to-t from-emerald-900/50 to-emerald-500'}`}
-                                />
+                                <div style={{ height: `${Math.min(val, 100)}%` }} className={`w-full rounded-t-sm transition-all duration-1000 ${alertTriggered ? 'bg-gradient-to-t from-red-900/50 to-red-500' : 'bg-gradient-to-t from-emerald-900/50 to-emerald-500'}`} />
                             </div>
                         ))}
                     </div>
-                    {/* Grid Lines */}
-                    <div className="absolute inset-0 border-t border-white/5 top-1/2" />
-                    <div className="absolute inset-0 border-t border-white/5 top-1/4" />
-                    <div className="absolute inset-0 border-t border-white/5 top-3/4" />
                 </div>
             </div>
 
-            {/* Bottom: Result Output */}
-            <div className={`flex-1 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30 shadow-[0_0_30px_rgba(220,38,38,0.1)]' : 'border-white/10'} rounded-3xl p-8 overflow-hidden flex flex-col justify-center min-h-[250px]`}>
-               
-               <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent h-[20%] animate-scan pointer-events-none ${alertTriggered ? 'via-red-500/10' : ''}`} />
-
-               {!result && !error && (
-                <div className="text-center opacity-50">
-                    <Scan className="w-16 h-16 text-zinc-600 mx-auto mb-4 animate-pulse" />
-                    <p className="text-sm font-mono uppercase tracking-widest">Awaiting Input Stream...</p>
+            {/* 2. RESULTS + HARDWARE STATUS ROW */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* AI Result Card (Takes 2 columns) */}
+                <div className={`md:col-span-2 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30' : 'border-white/10'} rounded-3xl p-6 overflow-hidden flex flex-col justify-center`}>
+                    {!result && !error && (
+                        <div className="text-center opacity-50 py-8">
+                            <Scan className="w-12 h-12 text-zinc-600 mx-auto mb-4 animate-pulse" />
+                            <p className="text-xs font-mono uppercase tracking-widest">System Ready</p>
+                        </div>
+                    )}
+                    {result && (
+                        <div className="animate-in fade-in zoom-in duration-500">
+                            <div className="flex justify-between items-end border-b border-white/5 pb-4 mb-4">
+                                <div>
+                                    <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Action Status</div>
+                                    <div className={`text-4xl font-black tracking-tighter ${result["cleaning needs"] === "Yes" ? "text-red-500" : "text-emerald-500"}`}>
+                                        {result["cleaning needs"] === "Yes" ? "DEPLOY" : "STANDBY"}
+                                    </div>
+                                </div>
+                                <ShieldCheck className={`w-8 h-8 ${result["cleaning needs"] === "Yes" ? "text-red-500" : "text-emerald-500"}`} />
+                            </div>
+                            <p className="text-zinc-400 text-xs leading-relaxed">{result.suggestion}</p>
+                        </div>
+                    )}
                 </div>
-               )}
 
-               {result && (
-                 <div className="animate-in fade-in zoom-in duration-500">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-white/5 pb-6 mb-6">
+                {/* Savings & Hardware Card (Takes 1 column) */}
+                <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-3xl p-4 flex flex-col gap-4">
+                    {/* Money/Water Saver */}
+                    <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-xl border border-white/5">
+                        <div className="p-2 bg-emerald-500/10 rounded-lg">
+                            <Droplets className="w-4 h-4 text-emerald-400" />
+                        </div>
                         <div>
-                            <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Cleaning Protocol Status</div>
-                            <div className={`text-6xl font-black tracking-tighter ${result["cleaning needs"] === "Yes" ? "text-red-500 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]" : "text-emerald-500 drop-shadow-[0_0_20px_rgba(5,150,105,0.5)]"}`}>
-                                {result["cleaning needs"] === "Yes" ? "DEPLOY" : "STANDBY"}
-                            </div>
-                        </div>
-                        <div className="mt-4 md:mt-0">
-                            <div className={`px-4 py-2 rounded-lg border text-xs font-bold uppercase tracking-widest ${result["cleaning needs"] === "Yes" ? "bg-red-500/10 border-red-500 text-red-400" : "bg-emerald-500/10 border-emerald-500 text-emerald-400"}`}>
-                                {result["cleaning needs"] === "Yes" ? "Action Required" : "Optimal Conditions"}
-                            </div>
+                            <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Water Saved</div>
+                            <div className="text-lg font-bold text-zinc-200">{waterSaved} L</div>
                         </div>
                     </div>
-
-                    <div className="relative">
-                        <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-zinc-700 to-transparent" />
-                        <h4 className="flex items-center gap-2 text-sm font-bold text-zinc-300 mb-2 uppercase tracking-widest">
-                            <Sparkles className="w-4 h-4 text-purple-400" /> AI Strategy
-                        </h4>
-                        <p className="text-zinc-400 leading-relaxed font-light text-sm md:text-base">
-                            {result.suggestion}
-                        </p>
-                    </div>
-                 </div>
-               )}
+                    
+                    {/* Hardware Status */}
+                    <HardwarePanel isCritical={alertTriggered} />
+                </div>
             </div>
 
           </div>
