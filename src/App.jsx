@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Wind, Droplets, Thermometer, Car, Activity, MapPin, Cpu, 
-  CheckCircle2, AlertTriangle, Loader2, Sparkles, Zap, 
-  BarChart3, Scan, RefreshCw, Siren, TrendingUp, Radio, Globe
+  Loader2, Sparkles, Zap, Scan, RefreshCw, Siren, TrendingUp, Globe, Crosshair
 } from 'lucide-react';
 
 // --- CONFIGURATION ---
@@ -24,7 +23,7 @@ const App = () => {
   useEffect(() => { setMounted(true); }, []);
 
   const [formData, setFormData] = useState({
-    street_id: '',
+    street_id: '04', // Default ID set kiya taki map par kuch dikhe
     pm2_5: '',
     pm10: '',
     humidity: '',
@@ -219,7 +218,7 @@ const App = () => {
             {/* Top Row: REAL MAP & Graph */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-64">
                 
-                {/* 1. REAL SATELLITE MAP (Original Color Mode) */}
+                {/* 1. REAL SATELLITE MAP with TARGET OVERLAY (Updated) */}
                 <div className="relative bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden group">
                     {/* Header Overlay */}
                     <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white/90 px-2 py-1 rounded shadow-lg backdrop-blur-sm">
@@ -227,21 +226,34 @@ const App = () => {
                         <span className="text-[10px] font-bold text-zinc-800 uppercase tracking-widest">Live Sat-Feed</span>
                     </div>
 
-                    {/* The Real Map (Iframe - Filters Removed for Original Look) */}
+                    {/* The Map */}
                     <iframe 
                         width="100%" 
-                        title="Live Map Feed"
                         height="100%" 
+                        title="Live Map Feed"
                         frameBorder="0" 
                         scrolling="no" 
                         marginHeight="0" 
                         marginWidth="0" 
                         src={`https://www.openstreetmap.org/export/embed.html?bbox=${CITY_LON-0.05}%2C${CITY_LAT-0.05}%2C${CITY_LON+0.05}%2C${CITY_LAT+0.05}&amp;layer=mapnik&amp;marker=${CITY_LAT}%2C${CITY_LON}`}
-                        className="w-full h-full"
+                        className="w-full h-full opacity-80"
                     ></iframe>
 
-                    {/* AI Scanner Overlay (Subtle) */}
-                    <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-${alertTriggered ? 'red' : 'emerald'}-500/20 to-transparent h-[10%] animate-scan pointer-events-none z-10`} />
+                    {/* --- NEW: VISIBLE MARKER/TARGET SYSTEM --- */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center justify-center">
+                        {/* The Pulse Effect */}
+                        <div className={`relative flex items-center justify-center w-12 h-12`}>
+                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${alertTriggered ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
+                            <div className={`relative inline-flex items-center justify-center rounded-full h-8 w-8 bg-black border-2 ${alertTriggered ? 'border-red-500' : 'border-emerald-500'}`}>
+                                <Crosshair className={`w-4 h-4 ${alertTriggered ? 'text-red-500' : 'text-emerald-500'}`} />
+                            </div>
+                        </div>
+                        
+                        {/* Info Tag pointing to the location */}
+                        <div className={`mt-2 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border ${alertTriggered ? 'bg-red-500/80 text-white border-red-400' : 'bg-black/70 text-emerald-400 border-emerald-500/50'}`}>
+                             STREET ID: {formData.street_id || 'SCANNING...'}
+                        </div>
+                    </div>
                 </div>
 
                 {/* 2. PREDICTION GRAPH */}
@@ -261,7 +273,6 @@ const App = () => {
                             </div>
                         ))}
                     </div>
-                    {/* Graph Grid Lines */}
                     <div className="absolute inset-0 border-t border-white/5 top-1/2" />
                     <div className="absolute inset-0 border-t border-white/5 top-1/4" />
                     <div className="absolute inset-0 border-t border-white/5 top-3/4" />
@@ -271,7 +282,6 @@ const App = () => {
             {/* Bottom: Result Output */}
             <div className={`flex-1 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30 shadow-[0_0_30px_rgba(220,38,38,0.1)]' : 'border-white/10'} rounded-3xl p-8 overflow-hidden flex flex-col justify-center min-h-[300px]`}>
                
-               {/* Scanline Effect */}
                <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent h-[20%] animate-scan pointer-events-none ${alertTriggered ? 'via-red-500/10' : ''}`} />
 
                {!result && !error && (
