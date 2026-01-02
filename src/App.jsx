@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Wind, Droplets, Thermometer, Car, Activity, MapPin, Cpu, 
   CheckCircle2, AlertTriangle, Loader2, Sparkles, Zap, 
-  BarChart3, Scan, RefreshCw, Siren, TrendingUp, Radio
+  BarChart3, Scan, RefreshCw, Siren, TrendingUp, Radio, Globe
 } from 'lucide-react';
 
 // --- CONFIGURATION ---
 const WEATHER_API_KEY = "e8f92dba56b67251fe8972441eb51dad"; 
-const CITY_LAT = 28.6139; 
-const CITY_LON = 77.2090; 
+const CITY_LAT = 28.6139; // Delhi Latitude
+const CITY_LON = 77.2090; // Delhi Longitude
 
 const App = () => {
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ const App = () => {
   const [mounted, setMounted] = useState(false);
   const [alertTriggered, setAlertTriggered] = useState(false);
   
-  // Fake historical data for the graph
+  // Graph data state
   const [graphData, setGraphData] = useState([40, 45, 30, 50, 45, 60, 55]);
 
   useEffect(() => { setMounted(true); }, []);
@@ -82,16 +82,13 @@ const App = () => {
     });
   };
 
-  // --- THE "WOW" FACTOR: DEMO MODE ---
+  // --- DEMO MODE ---
   const triggerDemoEmergency = () => {
     setFormData({
       street_id: 101, pm2_5: 350.5, pm10: 410.2, humidity: 20, 
       temperature: 42, traffic_density: 'High', dust_index: 380
     });
-    
-    // Graph shoots up
     setGraphData([60, 80, 120, 200, 350, 400, 420]);
-
     setTimeout(() => { setAlertTriggered(true); }, 500);
   };
 
@@ -102,7 +99,6 @@ const App = () => {
     setResult(null);
     setAlertTriggered(false);
 
-    // Simulate Graph Data based on input (if not demo)
     if (!alertTriggered) {
         setGraphData([
             Math.random()*50, Math.random()*60, Math.random()*50, 
@@ -172,7 +168,6 @@ const App = () => {
           {/* LEFT: INPUT PANEL */}
           <div className="lg:col-span-5 flex flex-col gap-6">
             <div className="bg-[#0A0A0A]/90 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-               {/* Decorative Gradient Line */}
                <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-${alertTriggered ? 'red' : 'emerald'}-500 to-transparent opacity-50`} />
 
               <div className="flex justify-between items-center mb-6">
@@ -221,38 +216,35 @@ const App = () => {
           {/* RIGHT: DASHBOARD (MAP + GRAPH + RESULT) */}
           <div className="lg:col-span-7 flex flex-col gap-6">
             
-            {/* Top Row: Map & Graph */}
+            {/* Top Row: REAL MAP & Graph */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-64">
                 
-                {/* 1. CYBERPUNK RADAR MAP (CSS Only - No Libraries) */}
-                <div className="relative bg-[#0A0A0A]/90 border border-white/10 rounded-3xl overflow-hidden p-4 group">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0%,transparent_70%)] opacity-50" />
-                    {/* Grid Lines */}
-                    <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
-                    
-                    {/* Header */}
-                    <div className="relative z-10 flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Sector Scan</span>
-                        <Radio className={`w-4 h-4 ${alertTriggered ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`} />
+                {/* 1. REAL SATELLITE MAP (Original Color Mode) */}
+                <div className="relative bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden group">
+                    {/* Header Overlay */}
+                    <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white/90 px-2 py-1 rounded shadow-lg backdrop-blur-sm">
+                        <Globe className="w-3 h-3 text-blue-600" />
+                        <span className="text-[10px] font-bold text-zinc-800 uppercase tracking-widest">Live Sat-Feed</span>
                     </div>
 
-                    {/* Radar Circle */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border border-white/10 rounded-full flex items-center justify-center">
-                         <div className={`w-28 h-28 border border-white/5 rounded-full flex items-center justify-center ${alertTriggered ? 'animate-ping opacity-20' : ''}`}>
-                             <div className="w-2 h-2 bg-white rounded-full shadow-[0_0_10px_white]" />
-                         </div>
-                         {/* Rotating Scanner Line */}
-                         <div className="absolute inset-0 border-t border-emerald-500/50 rounded-full animate-spin-slow origin-center" style={{ animationDuration: '4s' }}>
-                            <div className={`w-1/2 h-1/2 bg-gradient-to-r from-transparent ${alertTriggered ? 'to-red-500/30' : 'to-emerald-500/30'} transform rotate-45 origin-bottom-right`} />
-                         </div>
-                    </div>
-                    
-                    {/* Random Hotspots */}
-                    <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_red]" />
-                    <div className="absolute bottom-1/3 right-1/4 w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse delay-75" />
+                    {/* The Real Map (Iframe - Filters Removed for Original Look) */}
+                    <iframe 
+                        width="100%" 
+                        title="Live Map Feed"
+                        height="100%" 
+                        frameBorder="0" 
+                        scrolling="no" 
+                        marginHeight="0" 
+                        marginWidth="0" 
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${CITY_LON-0.05}%2C${CITY_LAT-0.05}%2C${CITY_LON+0.05}%2C${CITY_LAT+0.05}&amp;layer=mapnik&amp;marker=${CITY_LAT}%2C${CITY_LON}`}
+                        className="w-full h-full"
+                    ></iframe>
+
+                    {/* AI Scanner Overlay (Subtle) */}
+                    <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-${alertTriggered ? 'red' : 'emerald'}-500/20 to-transparent h-[10%] animate-scan pointer-events-none z-10`} />
                 </div>
 
-                {/* 2. PREDICTION GRAPH (Simple SVG Visualization) */}
+                {/* 2. PREDICTION GRAPH */}
                 <div className="relative bg-[#0A0A0A]/90 border border-white/10 rounded-3xl overflow-hidden p-4 flex flex-col">
                     <div className="flex justify-between items-center mb-4 z-10">
                          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">PM 2.5 Forecast</span>
@@ -269,7 +261,7 @@ const App = () => {
                             </div>
                         ))}
                     </div>
-                    {/* Grid Background */}
+                    {/* Graph Grid Lines */}
                     <div className="absolute inset-0 border-t border-white/5 top-1/2" />
                     <div className="absolute inset-0 border-t border-white/5 top-1/4" />
                     <div className="absolute inset-0 border-t border-white/5 top-3/4" />
@@ -279,7 +271,7 @@ const App = () => {
             {/* Bottom: Result Output */}
             <div className={`flex-1 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30 shadow-[0_0_30px_rgba(220,38,38,0.1)]' : 'border-white/10'} rounded-3xl p-8 overflow-hidden flex flex-col justify-center min-h-[300px]`}>
                
-               {/* Scanline */}
+               {/* Scanline Effect */}
                <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent h-[20%] animate-scan pointer-events-none ${alertTriggered ? 'via-red-500/10' : ''}`} />
 
                {!result && !error && (
@@ -324,9 +316,7 @@ const App = () => {
       
       <style>{`
         @keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(500%); } }
-        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-scan { animation: scan 3s linear infinite; }
-        .animate-spin-slow { animation: spin-slow 4s linear infinite; }
       `}</style>
     </div>
   );
