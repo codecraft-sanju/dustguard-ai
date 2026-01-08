@@ -442,7 +442,7 @@ const App = () => {
       <style>{`
         @keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(500%); } }
         .animate-scan { animation: scan 3s linear infinite; }
-      `}</style>//
+      `}</style>
     </div>
   );
 };
