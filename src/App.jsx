@@ -10,16 +10,16 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 // --- CONFIGURATION ---
 const MAPBOX_TOKEN = "pk.eyJ1Ijoic2FuanV1dTE4IiwiYSI6ImNtandqdmFicDV4em8zaHF4d3ptZndsZWcifQ.dPu5TNl1OPiZ6KtbFghp5Q"; 
 const WEATHER_API_KEY = "e8f92dba56b67251fe8972441eb51dad"; 
+const BACKEND_URL = "https://dust-guard-ai-1.onrender.com/sample-predict/"; // Your API
 
-// Base Coordinates (Delhi Center) - Hum iske aas paas ghumenge
+// Base Coordinates (Delhi Center)
 const BASE_LAT = 28.6139; 
 const BASE_LON = 77.2090; 
 
-// --- 1. SUB-COMPONENT: 3D MAP VISUALIZER (UPDATED FOR DYNAMIC MOVEMENT) ---
+// --- 1. SUB-COMPONENT: 3D MAP VISUALIZER ---
 const MapVisualizer = ({ lat, lon, isCritical }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
-  const markerRef = useRef(null); // Marker reference
 
   useEffect(() => {
     if (map.current) return; 
@@ -52,7 +52,7 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
           'type': 'fill-extrusion',
           'minzoom': 13,
           'paint': {
-            'fill-extrusion-color': '#222', // Thoda darker classy look
+            'fill-extrusion-color': '#222', 
             'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'height']],
             'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'min_height']],
             'fill-extrusion-opacity': 0.9
@@ -61,7 +61,6 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
         labelLayerId
       );
 
-      // Pollution Heat Source
       map.current.addSource('pollution-heat', {
         type: 'geojson',
         data: {
@@ -73,7 +72,6 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
         }
       });
 
-      // Pollution Glow Effect
       map.current.addLayer({
         id: 'pollution-glow',
         type: 'circle',
@@ -92,18 +90,18 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
   useEffect(() => {
     if (!map.current) return;
 
-    // 1. Move the Map Camera (FlyTo)
+    // Fly to new location smoothly
     map.current.flyTo({
         center: [lon, lat],
-        zoom: isCritical ? 16 : 14, // Critical mein zoom in, normal mein zoom out
+        zoom: isCritical ? 16 : 14,
         pitch: isCritical ? 60 : 50,
-        bearing: Math.random() * 20 - 10, // Slight rotation effect
-        speed: 0.8, // Smooth speed
+        bearing: Math.random() * 20 - 10,
+        speed: 0.8,
         curve: 1.2,
         essential: true
     });
 
-    // 2. Update the Pollution Glow Source Position
+    // Update Pollution Source Position
     const source = map.current.getSource('pollution-heat');
     if (source) {
         source.setData({
@@ -115,7 +113,7 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
         });
     }
 
-    // 3. Update Glow Color based on Critical Status
+    // Update Glow Color
     if (map.current.getLayer('pollution-glow')) {
         map.current.setPaintProperty('pollution-glow', 'circle-color', isCritical ? '#ef4444' : '#10b981');
         map.current.setPaintProperty('pollution-glow', 'circle-radius', isCritical ? 150 : 80);
@@ -200,60 +198,90 @@ const App = () => {
   
   // --- DYNAMIC LOCATION STATE ---
   const [currentLocation, setCurrentLocation] = useState({ lat: BASE_LAT, lon: BASE_LON });
-
   const [graphData, setGraphData] = useState([40, 45, 30, 50, 45, 60, 55]);
 
   useEffect(() => { setMounted(true); }, []);
 
-  // --- AUTOMATIC DATA & LOCATION SIMULATION ENGINE ---
+  // --- REUSABLE FUNCTION TO CALL BACKEND ---
+  const fetchPredictionFromBackend = async (payload) => {
+    try {
+      const response = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch');
+      const data = await response.json();
+      
+      setResult(data); // Set the REAL suggestion from API
+      
+      if (data["cleaning needs"] === "Yes") {
+        setAlertTriggered(true);
+      } else {
+        setAlertTriggered(false);
+      }
+    } catch (err) {
+      console.error("Backend Error:", err);
+      // Fallback only if backend fails
+      setResult({ "cleaning needs": "No", suggestion: "Backend Sync Error. Using Offline Protocols." });
+    }
+  };
+
+  // --- AUTOMATIC DATA & API SIMULATION ENGINE ---
   useEffect(() => {
     let interval;
     if (simulationActive) {
-      setResult({ "cleaning needs": "No", suggestion: "Monitoring Active: Drone Patrolling Sectors" });
-
+      // Start loop
       interval = setInterval(() => {
-        // 1. Generate Fake Sensor Data
+        // 1. Generate Fake Sensor Data (Simulating IoT)
         const simulatedPM25 = (Math.random() * 100 + 50 + (alertTriggered ? 150 : 0)).toFixed(1);
         const simulatedPM10 = (Math.random() * 100 + 80).toFixed(1);
         const newGraphValue = Math.min(Number(simulatedPM25), 400);
 
-        // 2. Generate Random Location HOP (Sector Hopping)
-        // Moves slightly around the Base Location (0.01 degree ~ 1km)
-        const latOffset = (Math.random() - 0.5) * 0.02; 
-        const lonOffset = (Math.random() - 0.5) * 0.02;
-        
+        // 2. Dynamic Location (Sector Hopping)
+        const latOffset = (Math.random() - 0.5) * 0.03; 
+        const lonOffset = (Math.random() - 0.5) * 0.03;
         const newLat = BASE_LAT + latOffset;
         const newLon = BASE_LON + lonOffset;
-
         setCurrentLocation({ lat: newLat, lon: newLon });
 
-        // 3. Update Form Data (UI)
-        setFormData(prev => ({
-          ...prev,
+        // 3. Update UI State
+        const newFormData = {
+          street_id: Math.floor(Math.random() * 200),
           pm2_5: simulatedPM25,
           pm10: simulatedPM10,
           humidity: Math.floor(Math.random() * 20 + 30),
           temperature: (Math.random() * 5 + 35).toFixed(1),
-          dust_index: Math.floor(Number(simulatedPM25) + 50),
-          street_id: Math.floor(Math.random() * 200) // Street ID bhi change hoga
-        }));
+          traffic_density: Math.random() > 0.5 ? 'High' : 'Medium',
+          dust_index: Math.floor(Number(simulatedPM25) + 50)
+        };
 
-        // 4. Update Graph
+        setFormData(newFormData);
+
         setGraphData(prev => {
           const newData = [...prev.slice(1), newGraphValue];
           return newData;
         });
 
-        // 5. Auto Trigger Alert
-        if (Number(simulatedPM25) > 250 && !alertTriggered) {
-           setAlertTriggered(true);
-           setResult({ "cleaning needs": "Yes", suggestion: "CRITICAL SPIKE: PM2.5 Exceeded safe limits. Automated smog deployment initiated." });
-        }
+        // 4. CALL THE REAL BACKEND API WITH SIMULATED DATA
+        // This ensures suggestions are real even in simulation mode
+        const payload = {
+          street_id: Number(newFormData.street_id), 
+          pm2_5: Number(newFormData.pm2_5), 
+          pm10: Number(newFormData.pm10),
+          humidity: Number(newFormData.humidity), 
+          temperature: Number(newFormData.temperature),
+          traffic_density: newFormData.traffic_density, 
+          dust_index: Number(newFormData.dust_index)
+        };
+        
+        fetchPredictionFromBackend(payload);
 
-      }, 4000); // 4 Seconds time for map to fly smoothly
+      }, 4000); // Fetch every 4 seconds
     }
     return () => clearInterval(interval);
-  }, [simulationActive, alertTriggered]);
+  }, [simulationActive]); // Removed alertTriggered dependency to prevent loop reset
 
   // --- VOICE COMMAND SETUP ---
   useEffect(() => {
@@ -269,13 +297,13 @@ const App = () => {
       recognition.onresult = (event) => {
         const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
         console.log("Voice:", transcript);
-        if (transcript.includes('activate') || transcript.includes('emergency') || transcript.includes('protocol')) {
+        if (transcript.includes('activate') || transcript.includes('emergency')) {
             triggerDemoEmergency();
         }
-        if (transcript.includes('reset') || transcript.includes('normal') || transcript.includes('stable')) {
+        if (transcript.includes('reset') || transcript.includes('normal')) {
             setAlertTriggered(false);
             setSimulationActive(false); 
-            setCurrentLocation({ lat: BASE_LAT, lon: BASE_LON }); // Reset to Center
+            setCurrentLocation({ lat: BASE_LAT, lon: BASE_LON });
             setGraphData([40, 45, 30, 50, 45, 60, 55]);
         }
       };
@@ -318,7 +346,6 @@ const App = () => {
           pm2_5: pm25, pm10: pm10, dust_index: Math.round((pm25 + pm10) / 2),
           street_id: Math.floor(Math.random() * 100)
         }));
-        // Reset Map to center on Fetch
         setCurrentLocation({ lat: BASE_LAT, lon: BASE_LON });
       }
     } catch (err) { simulateRandomData(); } 
@@ -366,22 +393,9 @@ const App = () => {
       traffic_density: formData.traffic_density, dust_index: Number(formData.dust_index)
     };
 
-    try {
-      const response = await fetch('https://dust-guard-ai-1.onrender.com/sample-predict/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'accept': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
-      setResult(data);
-      if (data["cleaning needs"] === "Yes") setAlertTriggered(true);
-    } catch (err) { setError('Connection corrupted. Syncing offline AI...'); setTimeout(() => {
-        setResult({ "cleaning needs": "Yes", suggestion: "AI Override: High particulate matter detected. Recommended immediate anti-smog gun deployment." });
-        setAlertTriggered(true);
-    }, 1500); } 
-    finally { setLoading(false); }
+    // Use the reusable function
+    await fetchPredictionFromBackend(payload);
+    setLoading(false);
   };
 
   return (
