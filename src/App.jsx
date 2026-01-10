@@ -142,7 +142,7 @@ const HardwarePanel = ({ isCritical }) => (
   </div>
 );
 
-// --- 4. SUB-COMPONENT: LIVE DRONE FEED (NEW) ---
+// --- 4. SUB-COMPONENT: LIVE DRONE FEED ---
 const DroneFeed = ({ isCritical }) => (
     <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-black h-48 group shadow-lg">
       {/* Overlay UI */}
@@ -189,10 +189,51 @@ const App = () => {
   const [alertTriggered, setAlertTriggered] = useState(false);
   const [listening, setListening] = useState(false);
   const [waterSaved, setWaterSaved] = useState(1240);
+  const [simulationActive, setSimulationActive] = useState(false); // New Simulation State
   
   const [graphData, setGraphData] = useState([40, 45, 30, 50, 45, 60, 55]);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // --- AUTOMATIC DATA SIMULATION ENGINE ---
+  useEffect(() => {
+    let interval;
+    if (simulationActive) {
+      // If simulation is active, trigger "Active" status immediately
+      setResult({ "cleaning needs": "No", suggestion: "Monitoring Active: Sensors Online" });
+
+      interval = setInterval(() => {
+        // 1. Generate Fake Sensor Data
+        const simulatedPM25 = (Math.random() * 100 + 50 + (alertTriggered ? 150 : 0)).toFixed(1);
+        const simulatedPM10 = (Math.random() * 100 + 80).toFixed(1);
+        const newGraphValue = Math.min(Number(simulatedPM25), 400);
+
+        // 2. Update Form Data (UI)
+        setFormData(prev => ({
+          ...prev,
+          pm2_5: simulatedPM25,
+          pm10: simulatedPM10,
+          humidity: Math.floor(Math.random() * 20 + 30),
+          temperature: (Math.random() * 5 + 35).toFixed(1),
+          dust_index: Math.floor(Number(simulatedPM25) + 50)
+        }));
+
+        // 3. Update Graph (Real-time movement)
+        setGraphData(prev => {
+          const newData = [...prev.slice(1), newGraphValue]; // Remove first, add new
+          return newData;
+        });
+
+        // 4. Auto Trigger Alert if Pollution is High (Threshold > 250)
+        if (Number(simulatedPM25) > 250 && !alertTriggered) {
+           setAlertTriggered(true);
+           setResult({ "cleaning needs": "Yes", suggestion: "CRITICAL SPIKE: PM2.5 Exceeded safe limits. Automated smog deployment initiated." });
+        }
+
+      }, 3000); // Update every 3 seconds
+    }
+    return () => clearInterval(interval);
+  }, [simulationActive, alertTriggered]);
 
   // --- VOICE COMMAND SETUP ---
   useEffect(() => {
@@ -213,6 +254,7 @@ const App = () => {
         }
         if (transcript.includes('reset') || transcript.includes('normal') || transcript.includes('stable')) {
             setAlertTriggered(false);
+            setSimulationActive(false); // Stop simulation on reset
             setGraphData([40, 45, 30, 50, 45, 60, 55]);
         }
       };
@@ -287,6 +329,8 @@ const App = () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    
+    // Legacy support for manual submit, but Simulation Mode is preferred
     setAlertTriggered(false);
 
     if (!alertTriggered) {
@@ -391,8 +435,21 @@ const App = () => {
                 </div>
                 <InputGroup label="Temp (°C)" icon={<Thermometer />} name="temperature" value={formData.temperature} onChange={handleChange} placeholder="24.5" fullWidth />
 
-                <button type="submit" disabled={loading} className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all hover:scale-[1.02] active:scale-[0.98] ${alertTriggered ? 'bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.5)]' : 'bg-emerald-600 text-white shadow-[0_0_20px_rgba(5,150,105,0.3)]'}`}>
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "RUN AI ANALYSIS"}
+                {/* --- TOGGLE BUTTON FOR SIMULATION MODE --- */}
+                <button 
+                  type="button" 
+                  onClick={() => setSimulationActive(!simulationActive)} 
+                  className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 ${simulationActive ? 'bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.5)]' : 'bg-zinc-800 text-zinc-400 border border-white/10'}`}
+                >
+                  {simulationActive ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" /> LIVE SENSOR FEED: ON
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-5 h-5" /> CONNECT SENSORS
+                    </>
+                  )}
                 </button>
               </form>
               
