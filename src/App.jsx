@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Wind, Droplets, Thermometer, Car, Activity, MapPin, Cpu, 
   Loader2, Sparkles, Zap, Scan, RefreshCw, Siren, TrendingUp, Globe, Crosshair,
-  Mic, Wifi, ShieldCheck, Banknote
+  Mic, Wifi, ShieldCheck, Banknote, Video
 } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -121,9 +121,9 @@ const InputGroup = ({ label, icon, name, value, onChange, placeholder, fullWidth
   </div>
 );
 
-// --- 3. SUB-COMPONENT: HARDWARE STATUS PANEL (NEW) ---
+// --- 3. SUB-COMPONENT: HARDWARE STATUS PANEL ---
 const HardwarePanel = ({ isCritical }) => (
-  <div className="grid grid-cols-3 gap-2 mt-4">
+  <div className="grid grid-cols-3 gap-2">
       <div className={`p-3 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-1 transition-all ${isCritical ? 'bg-red-900/20 border-red-500/30' : 'bg-zinc-900/50'}`}>
           <Wifi className={`w-4 h-4 ${isCritical ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`} />
           <span className="text-[9px] uppercase tracking-widest text-zinc-500">Grid Net</span>
@@ -142,7 +142,44 @@ const HardwarePanel = ({ isCritical }) => (
   </div>
 );
 
-// --- 4. MAIN APP COMPONENT ---
+// --- 4. SUB-COMPONENT: LIVE DRONE FEED (NEW) ---
+const DroneFeed = ({ isCritical }) => (
+    <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-black h-48 group shadow-lg">
+      {/* Overlay UI */}
+      <div className="absolute top-3 left-3 z-20 flex gap-2">
+        <div className="bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded animate-pulse flex items-center gap-1">
+          <div className="w-1.5 h-1.5 bg-white rounded-full" /> LIVE
+        </div>
+        <div className="bg-black/60 backdrop-blur text-zinc-300 text-[9px] font-mono px-2 py-0.5 rounded border border-white/10">
+          CAM-04
+        </div>
+      </div>
+      
+      {/* HUD Overlay */}
+      <div className="absolute inset-0 z-10 pointer-events-none">
+         <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-2 ${isCritical ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'border-emerald-500/50'} rounded-lg transition-all duration-500 flex items-center justify-center`}>
+            <div className={`w-1 h-1 rounded-full ${isCritical ? 'bg-red-500' : 'bg-emerald-500'}`} />
+         </div>
+         <div className="absolute bottom-3 right-3 text-[8px] font-mono text-emerald-400 bg-black/50 px-2 py-1 rounded border border-emerald-500/20">
+            AI TARGETING: {isCritical ? 'LOCKED' : 'SCANNING...'}
+         </div>
+         {/* Grid Lines */}
+         <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,127,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,127,0.03)_1px,transparent_1px)] bg-[size:20px_20px]" />
+      </div>
+  
+      {/* Simulated Video Feed (GIF) */}
+      <img 
+        src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcHJ4Z2w5bHl5eXJqbm14Z2w5bHl5eXJqbm14Z2w5bHl5eXJqbm14Z2w5bHl5eXJqbm0mdXJsPWh0dHBzOi8vbWVkaWEuZ2lwaHkuY29tL21lZGlhLzNQMnl4cHp5dzhqR2cvZ2lwaHkuZ2lm/3P2yxpzyw8jGg/giphy.gif" 
+        alt="Drone Feed" 
+        className="w-full h-full object-cover opacity-60 grayscale group-hover:grayscale-0 transition-all duration-500"
+      />
+      
+      {/* Scan Line Effect */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent h-[10px] w-full animate-scan pointer-events-none" />
+    </div>
+);
+
+// --- 5. MAIN APP COMPONENT ---
 const App = () => {
   const [loading, setLoading] = useState(false);
   const [dataFetching, setDataFetching] = useState(false);
@@ -399,10 +436,11 @@ const App = () => {
                 </div>
             </div>
 
-            {/* 2. RESULTS + HARDWARE STATUS ROW */}
+            {/* 2. RESULTS + HARDWARE/DRONE ROW */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
                 {/* AI Result Card (Takes 2 columns) */}
-                <div className={`md:col-span-2 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30' : 'border-white/10'} rounded-3xl p-6 overflow-hidden flex flex-col justify-center`}>
+                <div className={`md:col-span-2 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30' : 'border-white/10'} rounded-3xl p-6 overflow-hidden flex flex-col justify-center min-h-[250px]`}>
                     {!result && !error && (
                         <div className="text-center opacity-50 py-8">
                             <Scan className="w-12 h-12 text-zinc-600 mx-auto mb-4 animate-pulse" />
@@ -425,22 +463,26 @@ const App = () => {
                     )}
                 </div>
 
-                {/* Savings & Hardware Card (Takes 1 column) */}
-                <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-3xl p-4 flex flex-col gap-4">
-                    {/* Money/Water Saver */}
-                    <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-xl border border-white/5">
-                        <div className="p-2 bg-emerald-500/10 rounded-lg">
-                            <Droplets className="w-4 h-4 text-emerald-400" />
+                {/* Hardware & Drone Feed Column (Takes 1 column) */}
+                <div className="flex flex-col gap-4">
+                    {/* Status Card */}
+                    <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-3xl p-4 flex flex-col gap-4">
+                         <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-xl border border-white/5">
+                            <div className="p-2 bg-emerald-500/10 rounded-lg">
+                                <Droplets className="w-4 h-4 text-emerald-400" />
+                            </div>
+                            <div>
+                                <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Water Saved</div>
+                                <div className="text-lg font-bold text-zinc-200">{waterSaved} L</div>
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Water Saved</div>
-                            <div className="text-lg font-bold text-zinc-200">{waterSaved} L</div>
-                        </div>
+                        <HardwarePanel isCritical={alertTriggered} />
                     </div>
                     
-                    {/* Hardware Status */}
-                    <HardwarePanel isCritical={alertTriggered} />
+                    {/* NEW: LIVE DRONE FEED */}
+                    <DroneFeed isCritical={alertTriggered} />
                 </div>
+
             </div>
 
           </div>
