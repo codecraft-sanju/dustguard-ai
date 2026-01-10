@@ -10,13 +10,16 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 // --- CONFIGURATION ---
 const MAPBOX_TOKEN = "pk.eyJ1Ijoic2FuanV1dTE4IiwiYSI6ImNtandqdmFicDV4em8zaHF4d3ptZndsZWcifQ.dPu5TNl1OPiZ6KtbFghp5Q"; 
 const WEATHER_API_KEY = "e8f92dba56b67251fe8972441eb51dad"; 
-const CITY_LAT = 28.6139; // Delhi Latitude
-const CITY_LON = 77.2090; // Delhi Longitude
 
-// --- 1. SUB-COMPONENT: 3D MAP VISUALIZER ---
+// Base Coordinates (Delhi Center) - Hum iske aas paas ghumenge
+const BASE_LAT = 28.6139; 
+const BASE_LON = 77.2090; 
+
+// --- 1. SUB-COMPONENT: 3D MAP VISUALIZER (UPDATED FOR DYNAMIC MOVEMENT) ---
 const MapVisualizer = ({ lat, lon, isCritical }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
+  const markerRef = useRef(null); // Marker reference
 
   useEffect(() => {
     if (map.current) return; 
@@ -27,8 +30,8 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11', 
       center: [lon, lat],
-      zoom: 12,
-      pitch: 45,
+      zoom: 13,
+      pitch: 50,
       bearing: -17.6,
       antialias: true
     });
@@ -39,6 +42,7 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
         (layer) => layer.type === 'symbol' && layer.layout['text-field']
       ).id;
 
+      // 3D Buildings
       map.current.addLayer(
         {
           'id': 'add-3d-buildings',
@@ -48,15 +52,16 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
           'type': 'fill-extrusion',
           'minzoom': 13,
           'paint': {
-            'fill-extrusion-color': '#444',
+            'fill-extrusion-color': '#222', // Thoda darker classy look
             'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'height']],
             'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'min_height']],
-            'fill-extrusion-opacity': 0.6
+            'fill-extrusion-opacity': 0.9
           }
         },
         labelLayerId
       );
 
+      // Pollution Heat Source
       map.current.addSource('pollution-heat', {
         type: 'geojson',
         data: {
@@ -68,44 +73,54 @@ const MapVisualizer = ({ lat, lon, isCritical }) => {
         }
       });
 
+      // Pollution Glow Effect
       map.current.addLayer({
         id: 'pollution-glow',
         type: 'circle',
         source: 'pollution-heat',
         paint: {
-            'circle-radius': 80,
+            'circle-radius': 100,
             'circle-color': isCritical ? '#ef4444' : '#10b981',
-            'circle-opacity': 0.4,
-            'circle-blur': 0.5
+            'circle-opacity': 0.6,
+            'circle-blur': 0.8
         }
       });
     });
   }, []);
 
+  // --- DYNAMIC MOVEMENT LOGIC ---
   useEffect(() => {
     if (!map.current) return;
 
-    if (isCritical) {
-        map.current.flyTo({
-            center: [lon, lat],
-            zoom: 16,
-            pitch: 60,
-            speed: 1.2,
-            curve: 1,
-            essential: true
+    // 1. Move the Map Camera (FlyTo)
+    map.current.flyTo({
+        center: [lon, lat],
+        zoom: isCritical ? 16 : 14, // Critical mein zoom in, normal mein zoom out
+        pitch: isCritical ? 60 : 50,
+        bearing: Math.random() * 20 - 10, // Slight rotation effect
+        speed: 0.8, // Smooth speed
+        curve: 1.2,
+        essential: true
+    });
+
+    // 2. Update the Pollution Glow Source Position
+    const source = map.current.getSource('pollution-heat');
+    if (source) {
+        source.setData({
+            type: 'FeatureCollection',
+            features: [{
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [lon, lat] }
+            }]
         });
-        
-        if (map.current.getLayer('pollution-glow')) {
-            map.current.setPaintProperty('pollution-glow', 'circle-color', '#ef4444');
-            map.current.setPaintProperty('pollution-glow', 'circle-radius', 120);
-        }
-    } else {
-         map.current.flyTo({ zoom: 12, pitch: 45 });
-         if (map.current.getLayer('pollution-glow')) {
-            map.current.setPaintProperty('pollution-glow', 'circle-color', '#10b981');
-            map.current.setPaintProperty('pollution-glow', 'circle-radius', 80);
-         }
     }
+
+    // 3. Update Glow Color based on Critical Status
+    if (map.current.getLayer('pollution-glow')) {
+        map.current.setPaintProperty('pollution-glow', 'circle-color', isCritical ? '#ef4444' : '#10b981');
+        map.current.setPaintProperty('pollution-glow', 'circle-radius', isCritical ? 150 : 80);
+    }
+
   }, [isCritical, lat, lon]);
 
   return <div ref={mapContainer} className="w-full h-full opacity-90 min-h-[100%]" />;
@@ -145,7 +160,6 @@ const HardwarePanel = ({ isCritical }) => (
 // --- 4. SUB-COMPONENT: LIVE DRONE FEED ---
 const DroneFeed = ({ isCritical }) => (
     <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-black h-48 group shadow-lg">
-      {/* Overlay UI */}
       <div className="absolute top-3 left-3 z-20 flex gap-2">
         <div className="bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded animate-pulse flex items-center gap-1">
           <div className="w-1.5 h-1.5 bg-white rounded-full" /> LIVE
@@ -154,8 +168,6 @@ const DroneFeed = ({ isCritical }) => (
           CAM-04
         </div>
       </div>
-      
-      {/* HUD Overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none">
          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-2 ${isCritical ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'border-emerald-500/50'} rounded-lg transition-all duration-500 flex items-center justify-center`}>
             <div className={`w-1 h-1 rounded-full ${isCritical ? 'bg-red-500' : 'bg-emerald-500'}`} />
@@ -163,18 +175,13 @@ const DroneFeed = ({ isCritical }) => (
          <div className="absolute bottom-3 right-3 text-[8px] font-mono text-emerald-400 bg-black/50 px-2 py-1 rounded border border-emerald-500/20">
             AI TARGETING: {isCritical ? 'LOCKED' : 'SCANNING...'}
          </div>
-         {/* Grid Lines */}
          <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,127,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,127,0.03)_1px,transparent_1px)] bg-[size:20px_20px]" />
       </div>
-  
-      {/* Simulated Video Feed (GIF) */}
       <img 
         src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcHJ4Z2w5bHl5eXJqbm14Z2w5bHl5eXJqbm14Z2w5bHl5eXJqbm14Z2w5bHl5eXJqbm0mdXJsPWh0dHBzOi8vbWVkaWEuZ2lwaHkuY29tL21lZGlhLzNQMnl4cHp5dzhqR2cvZ2lwaHkuZ2lm/3P2yxpzyw8jGg/giphy.gif" 
         alt="Drone Feed" 
         className="w-full h-full object-cover opacity-60 grayscale group-hover:grayscale-0 transition-all duration-500"
       />
-      
-      {/* Scan Line Effect */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent h-[10px] w-full animate-scan pointer-events-none" />
     </div>
 );
@@ -189,18 +196,20 @@ const App = () => {
   const [alertTriggered, setAlertTriggered] = useState(false);
   const [listening, setListening] = useState(false);
   const [waterSaved, setWaterSaved] = useState(1240);
-  const [simulationActive, setSimulationActive] = useState(false); // New Simulation State
+  const [simulationActive, setSimulationActive] = useState(false);
   
+  // --- DYNAMIC LOCATION STATE ---
+  const [currentLocation, setCurrentLocation] = useState({ lat: BASE_LAT, lon: BASE_LON });
+
   const [graphData, setGraphData] = useState([40, 45, 30, 50, 45, 60, 55]);
 
   useEffect(() => { setMounted(true); }, []);
 
-  // --- AUTOMATIC DATA SIMULATION ENGINE ---
+  // --- AUTOMATIC DATA & LOCATION SIMULATION ENGINE ---
   useEffect(() => {
     let interval;
     if (simulationActive) {
-      // If simulation is active, trigger "Active" status immediately
-      setResult({ "cleaning needs": "No", suggestion: "Monitoring Active: Sensors Online" });
+      setResult({ "cleaning needs": "No", suggestion: "Monitoring Active: Drone Patrolling Sectors" });
 
       interval = setInterval(() => {
         // 1. Generate Fake Sensor Data
@@ -208,29 +217,40 @@ const App = () => {
         const simulatedPM10 = (Math.random() * 100 + 80).toFixed(1);
         const newGraphValue = Math.min(Number(simulatedPM25), 400);
 
-        // 2. Update Form Data (UI)
+        // 2. Generate Random Location HOP (Sector Hopping)
+        // Moves slightly around the Base Location (0.01 degree ~ 1km)
+        const latOffset = (Math.random() - 0.5) * 0.02; 
+        const lonOffset = (Math.random() - 0.5) * 0.02;
+        
+        const newLat = BASE_LAT + latOffset;
+        const newLon = BASE_LON + lonOffset;
+
+        setCurrentLocation({ lat: newLat, lon: newLon });
+
+        // 3. Update Form Data (UI)
         setFormData(prev => ({
           ...prev,
           pm2_5: simulatedPM25,
           pm10: simulatedPM10,
           humidity: Math.floor(Math.random() * 20 + 30),
           temperature: (Math.random() * 5 + 35).toFixed(1),
-          dust_index: Math.floor(Number(simulatedPM25) + 50)
+          dust_index: Math.floor(Number(simulatedPM25) + 50),
+          street_id: Math.floor(Math.random() * 200) // Street ID bhi change hoga
         }));
 
-        // 3. Update Graph (Real-time movement)
+        // 4. Update Graph
         setGraphData(prev => {
-          const newData = [...prev.slice(1), newGraphValue]; // Remove first, add new
+          const newData = [...prev.slice(1), newGraphValue];
           return newData;
         });
 
-        // 4. Auto Trigger Alert if Pollution is High (Threshold > 250)
+        // 5. Auto Trigger Alert
         if (Number(simulatedPM25) > 250 && !alertTriggered) {
            setAlertTriggered(true);
            setResult({ "cleaning needs": "Yes", suggestion: "CRITICAL SPIKE: PM2.5 Exceeded safe limits. Automated smog deployment initiated." });
         }
 
-      }, 3000); // Update every 3 seconds
+      }, 4000); // 4 Seconds time for map to fly smoothly
     }
     return () => clearInterval(interval);
   }, [simulationActive, alertTriggered]);
@@ -254,7 +274,8 @@ const App = () => {
         }
         if (transcript.includes('reset') || transcript.includes('normal') || transcript.includes('stable')) {
             setAlertTriggered(false);
-            setSimulationActive(false); // Stop simulation on reset
+            setSimulationActive(false); 
+            setCurrentLocation({ lat: BASE_LAT, lon: BASE_LON }); // Reset to Center
             setGraphData([40, 45, 30, 50, 45, 60, 55]);
         }
       };
@@ -262,7 +283,6 @@ const App = () => {
     }
   }, []);
 
-  // Water Saver Counter Effect
   useEffect(() => {
     if (!alertTriggered) {
         const interval = setInterval(() => {
@@ -284,9 +304,9 @@ const App = () => {
   const fetchLiveEnvironmentData = async () => {
     setDataFetching(true);
     try {
-      const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${CITY_LAT}&lon=${CITY_LON}&units=metric&appid=${WEATHER_API_KEY}`);
+      const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${BASE_LAT}&lon=${BASE_LON}&units=metric&appid=${WEATHER_API_KEY}`);
       const weatherData = await weatherRes.json();
-      const pollutionRes = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${CITY_LAT}&lon=${CITY_LON}&appid=${WEATHER_API_KEY}`);
+      const pollutionRes = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${BASE_LAT}&lon=${BASE_LON}&appid=${WEATHER_API_KEY}`);
       const pollutionData = await pollutionRes.json();
 
       if (weatherData.main && pollutionData.list) {
@@ -298,6 +318,8 @@ const App = () => {
           pm2_5: pm25, pm10: pm10, dust_index: Math.round((pm25 + pm10) / 2),
           street_id: Math.floor(Math.random() * 100)
         }));
+        // Reset Map to center on Fetch
+        setCurrentLocation({ lat: BASE_LAT, lon: BASE_LON });
       }
     } catch (err) { simulateRandomData(); } 
     finally { setDataFetching(false); }
@@ -329,8 +351,6 @@ const App = () => {
     setLoading(true);
     setError(null);
     setResult(null);
-    
-    // Legacy support for manual submit, but Simulation Mode is preferred
     setAlertTriggered(false);
 
     if (!alertTriggered) {
@@ -367,29 +387,25 @@ const App = () => {
   return (
     <div className="relative min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30 overflow-hidden">
       
-      {/* Background FX */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className={`absolute top-[-20%] left-[-10%] w-[70%] h-[70%] rounded-full blur-[120px] transition-all duration-1000 ${alertTriggered ? 'bg-red-900/30' : 'bg-emerald-900/10'}`} />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100px_100px]" />
       </div>
 
-      {/* Emergency Overlay */}
       {alertTriggered && (
         <div className="fixed top-0 left-0 w-full bg-red-500 text-black font-bold text-center py-2 z-50 animate-pulse tracking-widest uppercase text-sm">
-          ⚠ CRITICAL HAZARD • ANTI-SMOG PROTOCOL INITIATED • SECTOR 4 ⚠
+          ⚠ CRITICAL HAZARD • ANTI-SMOG PROTOCOL INITIATED • SECTOR {formData.street_id} ⚠
         </div>
       )}
 
       <div className={`relative z-10 max-w-7xl mx-auto px-4 py-12 lg:py-20 transition-opacity duration-1000 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
         
-        {/* Header */}
         <header className="mb-12 text-center space-y-4">
            <div className="flex justify-center items-center gap-4">
                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
                 <span className={`w-2 h-2 rounded-full ${alertTriggered ? 'bg-red-500 animate-ping' : 'bg-emerald-500'}`} />
                 <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Mainnet Connected</span>
               </div>
-              {/* MIC INDICATOR */}
               <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border backdrop-blur-md ${listening ? 'bg-red-500/10 border-red-500/50' : 'bg-white/5 border-white/10'}`}>
                 <Mic className={`w-3 h-3 ${listening ? 'text-red-400 animate-pulse' : 'text-zinc-500'}`} />
                 <span className={`text-[10px] font-mono uppercase tracking-widest ${listening ? 'text-red-400' : 'text-zinc-500'}`}>Voice Active</span>
@@ -435,7 +451,6 @@ const App = () => {
                 </div>
                 <InputGroup label="Temp (°C)" icon={<Thermometer />} name="temperature" value={formData.temperature} onChange={handleChange} placeholder="24.5" fullWidth />
 
-                {/* --- TOGGLE BUTTON FOR SIMULATION MODE --- */}
                 <button 
                   type="button" 
                   onClick={() => setSimulationActive(!simulationActive)} 
@@ -464,9 +479,8 @@ const App = () => {
           {/* RIGHT: DASHBOARD */}
           <div className="lg:col-span-7 flex flex-col gap-6">
             
-            {/* 1. MAP + GRAPH ROW */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[320px]">
-                {/* 3D MAP */}
+                {/* 3D MAP VISUALIZER (Takes Dynamic Location) */}
                 <div className="relative bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden group h-full">
                     <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-black/80 px-3 py-1.5 rounded border border-white/10 backdrop-blur-md">
                         <Globe className={`w-3 h-3 ${alertTriggered ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`} />
@@ -474,10 +488,10 @@ const App = () => {
                             {alertTriggered ? 'DRONE: ACTIVE' : 'SAT-FEED: LIVE'}
                         </span>
                     </div>
-                    <MapVisualizer lat={CITY_LAT} lon={CITY_LON} isCritical={alertTriggered} />
+                    {/* PASSING DYNAMIC LAT/LON HERE */}
+                    <MapVisualizer lat={currentLocation.lat} lon={currentLocation.lon} isCritical={alertTriggered} />
                 </div>
 
-                {/* GRAPH */}
                 <div className="relative bg-[#0A0A0A]/90 border border-white/10 rounded-3xl overflow-hidden p-4 flex flex-col h-full">
                     <div className="flex justify-between items-center mb-4 z-10">
                          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">PM 2.5 Spike Prediction</span>
@@ -493,10 +507,8 @@ const App = () => {
                 </div>
             </div>
 
-            {/* 2. RESULTS + HARDWARE/DRONE ROW */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 
-                {/* AI Result Card (Takes 2 columns) */}
                 <div className={`md:col-span-2 relative bg-[#0A0A0A]/90 border ${alertTriggered ? 'border-red-500/30' : 'border-white/10'} rounded-3xl p-6 overflow-hidden flex flex-col justify-center min-h-[250px]`}>
                     {!result && !error && (
                         <div className="text-center opacity-50 py-8">
@@ -520,9 +532,7 @@ const App = () => {
                     )}
                 </div>
 
-                {/* Hardware & Drone Feed Column (Takes 1 column) */}
                 <div className="flex flex-col gap-4">
-                    {/* Status Card */}
                     <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-3xl p-4 flex flex-col gap-4">
                          <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-xl border border-white/5">
                             <div className="p-2 bg-emerald-500/10 rounded-lg">
@@ -536,7 +546,6 @@ const App = () => {
                         <HardwarePanel isCritical={alertTriggered} />
                     </div>
                     
-                    {/* NEW: LIVE DRONE FEED */}
                     <DroneFeed isCritical={alertTriggered} />
                 </div>
 
